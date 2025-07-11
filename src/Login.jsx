@@ -3,7 +3,7 @@ import { handleLogin } from "./api/api.js";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-  const [useEmail, setUseEmail] = useState(true);
+  const [useEmail, setUseEmail] = useState(false);
   const [data, setData] = useState({
     criteria: {
       zip: "",
