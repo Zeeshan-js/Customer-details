@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { productFind } from "./api/api.js";
+import { useNavigate } from "react-router-dom";
 
 export default function Component() {
   let userData = null;
@@ -28,10 +29,15 @@ export default function Component() {
   const name = customer.first_name || customer.customer_name || "Customer";
   const orderList = customer.order_list;
   const orderIds = orderList ? orderList.split(",") : [];
-  const totalOrders = customer.order_count || 0;
-
+  // Count only approved orders (order_status === '2')
   const [orderDetails, setOrderDetails] = useState([]);
   const [loading, setLoading] = useState(true);
+  const approvedOrdersCount = orderDetails.filter(
+    detail => detail && detail.order_status === '2'
+  ).length;
+  const totalOrders = approvedOrdersCount;
+
+  const navigate = useNavigate();
 
   let nextPaymentDays = "-";
   let nextPaymentDate = "-";
@@ -40,10 +46,12 @@ export default function Component() {
     const now = new Date();
     let soonestDate = null;
     let soonestAmount = null;
+    let hasRecurring = false;
     orderDetails.forEach(order => {
       if (order && order.products && order.products.length > 0) {
         order.products.forEach(product => {
-          if (product.recurring_date && product.recurring_date !== "0000-00-00") {
+          if (product.is_recurring === "1" && product.recurring_date && product.recurring_date !== "0000-00-00") {
+            hasRecurring = true;
             const recurDate = new Date(product.recurring_date);
             if (recurDate > now && (!soonestDate || recurDate < soonestDate)) {
               soonestDate = recurDate;
@@ -53,11 +61,15 @@ export default function Component() {
         });
       }
     });
-    if (soonestDate) {
+    if (hasRecurring && soonestDate) {
       nextPaymentDate = soonestDate.toLocaleDateString();
       const diffTime = soonestDate - now;
       nextPaymentDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       nextPaymentAmount = soonestAmount;
+    } else {
+      nextPaymentDays = "";
+      nextPaymentDate = "";
+      nextPaymentAmount = "";
     }
   }
 
@@ -80,6 +92,18 @@ export default function Component() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-100 to-indigo-100 py-10 px-2 font-sans">
+      {/* Logout Button */}
+      <div className="max-w-3xl mx-auto flex justify-end mb-2">
+        <button
+          className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2 rounded-lg shadow transition"
+          onClick={() => {
+            localStorage.clear();
+            navigate("/");
+          }}
+        >
+          Logout
+        </button>
+      </div>
       <div className="max-w-3xl mx-auto mb-10">
         <div className="flex flex-col items-center gap-4 bg-white/80 rounded-2xl shadow-xl p-8 border-t-8 border-blue-300">
           <h1 className="text-3xl font-extrabold text-indigo-700 mb-1 tracking-tight">Welcome, <span className="text-blue-600">{name}</span>!</h1>
@@ -120,40 +144,42 @@ export default function Component() {
                 </tr>
               </thead>
               <tbody>
-                {orderDetails.length > 0 ? orderDetails.map((detail, idx) => {
-                  if (!detail || detail.error) {
-                    return (
-                      <tr key={idx} className="bg-red-50">
-                        <td colSpan={5} className="text-red-400 py-4 text-center">Failed to load order</td>
+                {orderDetails.length > 0 ? orderDetails
+                  .filter(detail => detail && detail.order_status === '2')
+                  .map((detail, idx) => {
+                    if (!detail || detail.error) {
+                      return (
+                        <tr key={idx} className="bg-red-50">
+                          <td colSpan={5} className="text-red-400 py-4 text-center">Failed to load order</td>
+                        </tr>
+                      );
+                    }
+                    const order = detail;
+                    return order.products && order.products.length > 0 ? (
+                      order.products.map((product, pidx) => (
+                        <tr key={pidx} className={((idx + pidx) % 2 === 0 ? "bg-blue-50" : "bg-gray-50") + " hover:bg-indigo-50 rounded-xl shadow-sm transition-all duration-200"}>
+                          <td className="py-2 px-3 font-semibold text-blue-700">{idx + 1}.{pidx + 1}</td>
+                          <td className="py-2 px-3">
+                            <div className="font-medium text-indigo-900">{product.name}</div>
+                            <div className="text-xs text-gray-400">Order #{order.order_id}</div>
+                          </td>
+                          <td className="py-2 px-3 text-indigo-800">{order.acquisition_date?.split(" ")[0] || "-"}</td>
+                          <td className="py-2 px-3 text-indigo-800">{product.price || "-"}</td>
+                          <td className="py-2 px-3">
+                            {product.billing_model?.name === "Monthly Subscription" ? (
+                              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">Monthly Subscription</span>
+                            ) : (
+                              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">One Time Purchase</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr key={idx}>
+                        <td colSpan={5} className="text-center text-indigo-400 py-8">No products found for this order.</td>
                       </tr>
                     );
-                  }
-                  const order = detail;
-                  return order.products && order.products.length > 0 ? (
-                    order.products.map((product, pidx) => (
-                      <tr key={pidx} className={((idx + pidx) % 2 === 0 ? "bg-blue-50" : "bg-gray-50") + " hover:bg-indigo-50 rounded-xl shadow-sm transition-all duration-200"}>
-                        <td className="py-2 px-3 font-semibold text-blue-700">{idx + 1}.{pidx + 1}</td>
-                        <td className="py-2 px-3">
-                          <div className="font-medium text-indigo-900">{product.name}</div>
-                          <div className="text-xs text-gray-400">Order #{order.order_id}</div>
-                        </td>
-                        <td className="py-2 px-3 text-indigo-800">{order.acquisition_date?.split(" ")[0] || "-"}</td>
-                        <td className="py-2 px-3 text-indigo-800">{product.price || "-"}</td>
-                        <td className="py-2 px-3">
-                          {product.billing_model?.name === "Monthly Subscription" ? (
-                            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">Monthly Subscription</span>
-                          ) : (
-                            <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold">One Time Purchase</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr key={idx}>
-                      <td colSpan={5} className="text-center text-indigo-400 py-8">No products found for this order.</td>
-                    </tr>
-                  );
-                }) : (
+                  }) : (
                   <tr>
                     <td colSpan={5} className="text-center text-indigo-400 py-8">No orders found.</td>
                   </tr>
