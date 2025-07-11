@@ -49,22 +49,6 @@ const productFind = async (orderId, startDate = "01/01/2000", endDage = "01/01/2
     }
     try {
         const response = await api.post(`order_view`, req_body);
-
-        const { is_recurring, recurring_date, products, } = response.data
-
-        // const minimalResponse = responseArray.map((item) => ({
-        //     subscription: item.is_recurring,
-        //     next_subscription: item.recurring_date,
-        //     price: item.product.price,
-        //     billing_model: item.product.billing_model.name,
-        // }))
-
-        const minimalResponse = {
-            subscription: is_recurring,
-            next_subscription: recurring_date,
-            price: products.forEach(product => product.billing_model.price),
-        }
-
         return response.data;
         
     } catch (error) {
