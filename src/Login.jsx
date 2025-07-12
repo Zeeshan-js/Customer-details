@@ -19,11 +19,37 @@ export default function Login() {
       setError("Phone and Zip Code are required.");
       return;
     }
+    // Try to find the customer in localStorage first
+    let customers = [];
+    try {
+      customers = JSON.parse(localStorage.getItem("customers")) || [];
+    } catch (e) {
+      customers = [];
+    }
+    // Find by phone and zip (assuming these are unique per customer)
+    const existingCustomer = customers.find(c => c.phone === data.criteria.phone && c.zip === data.criteria.zip);
+    if (existingCustomer) {
+      // Set as active session
+      localStorage.setItem("userData", JSON.stringify(existingCustomer));
+      navigate("/component");
+      return;
+    }
     try {
       const userData = await handleLogin(
         data.criteria.zip,
         data.criteria.phone
       );
+      // Attach phone and zip to the root of the userData object for reliable matching
+      userData.phone = data.criteria.phone;
+      userData.zip = data.criteria.zip;
+      // Add new customer to localStorage
+      const existingIndex = customers.findIndex(c => c.customer_ids === userData.customer_ids);
+      if (existingIndex !== -1) {
+        customers[existingIndex] = userData; // Update existing
+      } else {
+        customers.push(userData); // Add new
+      }
+      localStorage.setItem("customers", JSON.stringify(customers));
       localStorage.setItem("userData", JSON.stringify(userData));
       navigate("/component");
     } catch (error) {

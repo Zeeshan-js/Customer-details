@@ -78,7 +78,26 @@ export default function Component() {
     async function fetchOrderDetails() {
       setLoading(true);
       try {
-        const details = await Promise.all(orderIds.map(id => productFind(id)));
+        // Get cached order details from localStorage
+        let cachedOrderDetails = {};
+        try {
+          cachedOrderDetails = JSON.parse(localStorage.getItem("orderDetails")) || {};
+        } catch (e) {
+          cachedOrderDetails = {};
+        }
+        // Prepare promises for each orderId
+        const detailPromises = orderIds.map(async id => {
+          if (cachedOrderDetails[id]) {
+            return cachedOrderDetails[id];
+          } else {
+            const detail = await productFind(id);
+            cachedOrderDetails[id] = detail;
+            return detail;
+          }
+        });
+        const details = await Promise.all(detailPromises);
+        // Save updated cache
+        localStorage.setItem("orderDetails", JSON.stringify(cachedOrderDetails));
         if (isMounted) setOrderDetails(details);
       } finally {
         if (isMounted) setLoading(false);
@@ -97,7 +116,8 @@ export default function Component() {
         <button
           className="bg-red-500 hover:bg-red-600 text-white font-semibold px-5 py-2 rounded-lg shadow transition"
           onClick={() => {
-            localStorage.clear();
+            localStorage.removeItem("userData");
+            // localStorage.clear(); // Remove this to preserve all customers
             navigate("/");
           }}
         >
